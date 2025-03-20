@@ -76,7 +76,8 @@ func (p *Parser) InstructionParse(data []byte) (map[string]interface{}, error) {
 				if bytes.Equal(data[:4], discriminatorBytes) {
 					argsValues := make(map[string]interface{})
 					argsValues["discriminator"] = instructionMap["discriminator"]
-					argsValues["args"] = extractArgs(data[4:], instructionMap["args"].([]interface{}), types)
+					argsValues["data"] = extractArgs(data[4:], instructionMap["args"].([]interface{}), types)
+					argsValues["type"] = "instruction"
 					return argsValues, nil
 				}
 			}
@@ -92,12 +93,46 @@ func (p *Parser) InstructionParse(data []byte) (map[string]interface{}, error) {
 			if bytes.Equal(data[:8], hash[:8]) {
 				argsValues := make(map[string]interface{})
 				argsValues["name"] = instructionMap["name"]
-				argsValues["args"] = extractArgs(data[8:], instructionMap["args"].([]interface{}), types)
+				argsValues["data"] = extractArgs(data[8:], instructionMap["args"].([]interface{}), types)
+				argsValues["type"] = "instruction"
 				return argsValues, nil
 			}
 		}
 	}
 	return nil, errors.New("can't find instruction")
+}
+
+func (p *Parser) AccountsParse(data []byte) (map[string]interface{}, error) {
+	accounts, ok := p.idlMap["accounts"].([]interface{})
+	if !ok {
+		return nil, errors.New("accounts not found in IDL")
+	}
+
+	types, ok := p.idlMap["types"].([]interface{})
+	if !ok {
+		return nil, errors.New("types not found in IDL")
+	}
+
+	for _, account := range accounts {
+		accountMap, ok := account.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if discriminator, ok := accountMap["discriminator"].(string); ok {
+			discriminatorBytes := []byte(discriminator)
+			discriminatorBytesLen := len(discriminatorBytes)
+			if bytes.Equal(data[:discriminatorBytesLen], discriminatorBytes) {
+				argsValues := make(map[string]interface{})
+				argsValues["discriminator"] = discriminator
+				argsValues["data"] = extractArgs(data[discriminatorBytesLen:], accountMap["type"].([]interface{}), types)
+				argsValues["type"] = "account"
+				return argsValues, nil
+			}
+		} else {
+			return nil, errors.New("can't find discriminator")
+		}
+	}
+	return nil, errors.New("can't find accounts")
 }
 
 func (p *Parser) EventParse(log string) (map[string]interface{}, error) {
@@ -138,34 +173,20 @@ func (p *Parser) eventDataParse(data []byte) (map[string]interface{}, error) {
 		if !ok {
 			continue
 		}
-		if discriminator, ok := eventMap["discriminator"].([]interface{}); ok {
-			if len(discriminator) == 4 {
-				discriminatorBytes := make([]byte, 4)
-				for i, val := range discriminator {
-					discriminatorBytes[i] = byte(val.(float64))
-				}
 
-				if bytes.Equal(data[:4], discriminatorBytes) {
-					argsValues := make(map[string]interface{})
-					argsValues["discriminator"] = eventMap["discriminator"]
-					argsValues["args"] = extractArgs(data[4:], eventMap["args"].([]interface{}), types)
-					return argsValues, nil
-				}
-			}
-		} else {
-			eventName, ok := eventMap["name"].(string)
+		eventName, ok := eventMap["name"].(string)
 
-			if !ok {
-				continue
-			}
-			hash := sha256.Sum256([]byte(fmt.Sprintf("event:%s", eventName)))
+		if !ok {
+			continue
+		}
+		hash := sha256.Sum256([]byte(fmt.Sprintf("event:%s", eventName)))
 
-			if bytes.Equal(data[:8], hash[:8]) {
-				argsValues := make(map[string]interface{})
-				argsValues["name"] = eventName
-				argsValues["fields"] = extractArgs(data[8:], eventMap["fields"].([]interface{}), types)
-				return argsValues, nil
-			}
+		if bytes.Equal(data[:8], hash[:8]) {
+			argsValues := make(map[string]interface{})
+			argsValues["name"] = eventName
+			argsValues["data"] = extractArgs(data[8:], eventMap["fields"].([]interface{}), types)
+			argsValues["type"] = "event"
+			return argsValues, nil
 		}
 	}
 	return nil, errors.New("can't find event")
