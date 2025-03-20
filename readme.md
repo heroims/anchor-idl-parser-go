@@ -13,20 +13,21 @@ import (
 )
 
 func main() {
-	// Create Parser
+    // Create Parser
     ammIdlParser, err := aip.NewParser("path/to/amm_idl.json")
 
-	if err == nil {
-		// Parse instruction (support cpi log)
-	    insInfo, insErr := ammIdlParser.InstructionParse(instructionData)
+    if err == nil {
+        // Parse instruction (support cpi log)
+        insInfo, insErr := ammIdlParser.InstructionParse(instructionData)
 
         // Parse account
-	    accountInfo, accErr := ammIdlParser.AccountsParse(accountData)
+        accountInfo, accErr := ammIdlParser.AccountsParse(accountData)
 
         // Parse log
-	    eventInfo, eventErr := ammIdlParser.eventDataParse(logString)
-	}
-
-	
+        eventInfo, eventErr := ammIdlParser.eventDataParse(logString)
+    }
 }
 ```
+## References
+- [Anchor](https://github.com/coral-xyz/anchor)  
+- [anchor-idl-go](https://github.com/BCH-labs/anchor-idl-go)  
