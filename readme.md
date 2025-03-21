@@ -24,7 +24,7 @@ func main() {
         accountInfo, accErr := ammIdlParser.AccountsParse(accountData)
 
         // Parse log
-        eventInfo, eventErr := ammIdlParser.eventDataParse(logString)
+        eventInfo, eventErr := ammIdlParser.EventDataParse(logString)
     }
 }
 ```
