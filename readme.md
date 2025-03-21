@@ -14,7 +14,8 @@ import (
 
 func main() {
     // Create Parser
-    ammIdlParser, err := aip.NewParser("path/to/amm_idl.json")
+    ammIdlParser, err := aip.NewParserWithPath("path/to/amm_idl.json")
+    ammIdlParser, err := aip.NewParserWithJson("{\"json\": \"data\"}")
 
     if err == nil {
         // Parse instruction (support cpi log)
