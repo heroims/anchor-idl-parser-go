@@ -20,7 +20,19 @@ type Parser struct {
 	idlMap  map[string]interface{}
 }
 
-func NewParser(idlPath string) (*Parser, error) {
+func (p *Parser) GetIdlMap() map[string]interface{} {
+	return p.idlMap
+}
+
+func (p *Parser) GetIdlJson() string {
+	return p.idlJson
+}
+
+func (p *Parser) GetIdlPath() string {
+	return p.idlPath
+}
+
+func NewParserWithPath(idlPath string) (*Parser, error) {
 	idlData, err := os.ReadFile(idlPath)
 	if err != nil {
 		return nil, err
@@ -34,6 +46,31 @@ func NewParser(idlPath string) (*Parser, error) {
 	return &Parser{
 		idlPath: idlPath,
 		idlJson: idlJson,
+		idlMap:  idlMap,
+	}, nil
+}
+
+func NewParserWithJson(idlJson string) (*Parser, error) {
+	var idlMap map[string]interface{}
+	err := json.Unmarshal([]byte(idlJson), &idlMap)
+	if err != nil {
+		return nil, err
+	}
+	return &Parser{
+		idlPath: "",
+		idlJson: idlJson,
+		idlMap:  idlMap,
+	}, nil
+}
+
+func NewParserWithJsonMap(idlMap map[string]interface{}) (*Parser, error) {
+	jsonBytes, err := json.Marshal(idlMap)
+	if err != nil {
+		panic(err)
+	}
+	return &Parser{
+		idlPath: "",
+		idlJson: string(jsonBytes),
 		idlMap:  idlMap,
 	}, nil
 }
