@@ -165,6 +165,12 @@ func extractPrimitive(data []byte, offset int, argType string) (interface{}, int
 		} else {
 			return base58.Encode(data[offset : offset+32]), 32
 		}
+	case "pubkey":
+		if len(data[offset:]) < 32 {
+			return nil, 32
+		} else {
+			return base58.Encode(data[offset : offset+32]), 32
+		}
 	case "string":
 		strLen := binary.LittleEndian.Uint32(data[offset : offset+4])
 		var n int = 4

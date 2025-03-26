@@ -4,12 +4,10 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"strings"
 
@@ -116,11 +114,8 @@ func (p *Parser) InstructionParse(data []byte) (map[string]interface{}, error) {
 			if bytes.Equal(data[:8], discriminatorBytes) {
 				argsValues := make(map[string]interface{})
 				argsValues["name"] = instructionMap["name"]
-				var discriminatorResult float64
-				bits := binary.LittleEndian.Uint64(discriminatorBytes)
-				discriminatorResult = math.Float64frombits(bits)
-				argsValues["discriminator"] = discriminatorResult
-				argsValues["data"] = extractArgs(data[4:], instructionMap["args"].([]interface{}), types)
+				argsValues["discriminator"] = instructionMap["discriminator"]
+				argsValues["data"] = extractArgs(data[8:], instructionMap["args"].([]interface{}), types)
 				argsValues["type"] = "instruction"
 				return argsValues, nil
 			}
@@ -216,20 +211,48 @@ func (p *Parser) eventDataParse(data []byte) (map[string]interface{}, error) {
 		if !ok {
 			continue
 		}
+		if discriminator, ok := eventMap["discriminator"].([]interface{}); ok {
+			discriminatorBytes := make([]byte, 8)
+			for i, val := range discriminator {
+				discriminatorBytes[i] = byte(val.(float64))
+			}
 
-		eventName, ok := eventMap["name"].(string)
+			if bytes.Equal(data[:8], discriminatorBytes) {
+				argsValues := make(map[string]interface{})
+				argsValues["name"] = eventMap["name"]
+				argsValues["discriminator"] = eventMap["discriminator"]
+				var eventArgs []interface{}
+				for _, typeVal := range types {
+					typeMap, ok := typeVal.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					if typeMap["name"] == eventMap["name"] {
+						if typeDetails, ok := typeMap["type"].(map[string]interface{}); ok {
+							eventArgs = typeDetails["fields"].([]interface{})
+						}
+						break
+					}
+				}
+				argsValues["data"] = extractArgs(data[8:], eventArgs, types)
+				argsValues["type"] = "event"
+				return argsValues, nil
+			}
+		} else {
+			eventName, ok := eventMap["name"].(string)
 
-		if !ok {
-			continue
-		}
-		hash := sha256.Sum256([]byte(fmt.Sprintf("event:%s", eventName)))
+			if !ok {
+				continue
+			}
+			hash := sha256.Sum256([]byte(fmt.Sprintf("event:%s", eventName)))
 
-		if bytes.Equal(data[:8], hash[:8]) {
-			argsValues := make(map[string]interface{})
-			argsValues["name"] = eventName
-			argsValues["data"] = extractArgs(data[8:], eventMap["fields"].([]interface{}), types)
-			argsValues["type"] = "event"
-			return argsValues, nil
+			if bytes.Equal(data[:8], hash[:8]) {
+				argsValues := make(map[string]interface{})
+				argsValues["name"] = eventName
+				argsValues["data"] = extractArgs(data[8:], eventMap["fields"].([]interface{}), types)
+				argsValues["type"] = "event"
+				return argsValues, nil
+			}
 		}
 	}
 	return nil, errors.New("can't find event")
