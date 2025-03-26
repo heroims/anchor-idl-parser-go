@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 
@@ -76,16 +78,18 @@ func NewParserWithJsonMap(idlMap map[string]interface{}) (*Parser, error) {
 }
 
 func (p *Parser) InstructionParse(data []byte) (map[string]interface{}, error) {
-	if len(data) >= 8 {
-		hexStr := "1d9acb512ea545e4"
-		cpiDiscriminatorBytes, err := hex.DecodeString(hexStr)
-		cpiDiscriminatorBytes = utils.ReverseBytes(cpiDiscriminatorBytes)
-		if err != nil {
-			return nil, errors.New("DecodeString failed")
-		}
-		if bytes.Equal(data[:8], cpiDiscriminatorBytes) {
-			return p.cpiEventParse(data[8:])
-		}
+	if len(data) < 8 {
+		return nil, errors.New("invalid data length")
+	}
+
+	hexStr := "1d9acb512ea545e4"
+	cpiDiscriminatorBytes, err := hex.DecodeString(hexStr)
+	cpiDiscriminatorBytes = utils.ReverseBytes(cpiDiscriminatorBytes)
+	if err != nil {
+		return nil, errors.New("DecodeString failed")
+	}
+	if bytes.Equal(data[:8], cpiDiscriminatorBytes) {
+		return p.cpiEventParse(data[8:])
 	}
 
 	instructions, ok := p.idlMap["instructions"].([]interface{})
@@ -104,19 +108,21 @@ func (p *Parser) InstructionParse(data []byte) (map[string]interface{}, error) {
 			continue
 		}
 		if discriminator, ok := instructionMap["discriminator"].([]interface{}); ok {
-			if len(discriminator) == 4 {
-				discriminatorBytes := make([]byte, 4)
-				for i, val := range discriminator {
-					discriminatorBytes[i] = byte(val.(float64))
-				}
+			discriminatorBytes := make([]byte, 8)
+			for i, val := range discriminator {
+				discriminatorBytes[i] = byte(val.(float64))
+			}
 
-				if bytes.Equal(data[:4], discriminatorBytes) {
-					argsValues := make(map[string]interface{})
-					argsValues["discriminator"] = instructionMap["discriminator"]
-					argsValues["data"] = extractArgs(data[4:], instructionMap["args"].([]interface{}), types)
-					argsValues["type"] = "instruction"
-					return argsValues, nil
-				}
+			if bytes.Equal(data[:8], discriminatorBytes) {
+				argsValues := make(map[string]interface{})
+				argsValues["name"] = instructionMap["name"]
+				var discriminatorResult float64
+				bits := binary.LittleEndian.Uint64(discriminatorBytes)
+				discriminatorResult = math.Float64frombits(bits)
+				argsValues["discriminator"] = discriminatorResult
+				argsValues["data"] = extractArgs(data[4:], instructionMap["args"].([]interface{}), types)
+				argsValues["type"] = "instruction"
+				return argsValues, nil
 			}
 		} else {
 			instructionName, ok := instructionMap["name"].(string)
