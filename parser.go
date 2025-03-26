@@ -106,16 +106,18 @@ func (p *Parser) InstructionParse(data []byte) (map[string]interface{}, error) {
 			continue
 		}
 		if discriminator, ok := instructionMap["discriminator"].([]interface{}); ok {
-			discriminatorBytes := make([]byte, 8)
+			discriminatorBytesLen := len(discriminator)
+
+			discriminatorBytes := make([]byte, discriminatorBytesLen)
 			for i, val := range discriminator {
 				discriminatorBytes[i] = byte(val.(float64))
 			}
 
-			if bytes.Equal(data[:8], discriminatorBytes) {
+			if bytes.Equal(data[:discriminatorBytesLen], discriminatorBytes) {
 				argsValues := make(map[string]interface{})
 				argsValues["name"] = instructionMap["name"]
 				argsValues["discriminator"] = instructionMap["discriminator"]
-				argsValues["data"] = extractArgs(data[8:], instructionMap["args"].([]interface{}), types)
+				argsValues["data"] = extractArgs(data[discriminatorBytesLen:], instructionMap["args"].([]interface{}), types)
 				argsValues["type"] = "instruction"
 				return argsValues, nil
 			}
@@ -156,18 +158,53 @@ func (p *Parser) AccountsParse(data []byte) (map[string]interface{}, error) {
 		if !ok {
 			continue
 		}
-		if discriminator, ok := accountMap["discriminator"].(string); ok {
-			discriminatorBytes := []byte(discriminator)
-			discriminatorBytesLen := len(discriminatorBytes)
+		if discriminator, ok := accountMap["discriminator"].([]interface{}); ok {
+			discriminatorBytesLen := len(discriminator)
+
+			discriminatorBytes := make([]byte, discriminatorBytesLen)
+			for i, val := range discriminator {
+				discriminatorBytes[i] = byte(val.(float64))
+			}
 			if bytes.Equal(data[:discriminatorBytesLen], discriminatorBytes) {
 				argsValues := make(map[string]interface{})
 				argsValues["discriminator"] = discriminator
-				argsValues["data"] = extractArgs(data[discriminatorBytesLen:], accountMap["type"].([]interface{}), types)
+				var accountArgs []interface{}
+				for _, typeVal := range types {
+					typeMap, ok := typeVal.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					if typeMap["name"] == accountMap["name"] {
+						if typeDetails, ok := typeMap["type"].(map[string]interface{}); ok {
+							accountArgs = typeDetails["fields"].([]interface{})
+						}
+						break
+					}
+				}
+				argsValues["data"] = extractArgs(data[discriminatorBytesLen:], accountArgs, types)
 				argsValues["type"] = "account"
 				return argsValues, nil
 			}
 		} else {
-			return nil, errors.New("can't find discriminator")
+			accountName, ok := accountMap["name"].(string)
+
+			if !ok {
+				continue
+			}
+			accountName = utils.ToSnakeCase(accountName)
+			hash := sha256.Sum256([]byte(fmt.Sprintf("global:%s", accountName)))
+
+			if bytes.Equal(data[:8], hash[:8]) {
+				argsValues := make(map[string]interface{})
+				argsValues["name"] = accountMap["name"]
+				var accountArgs []interface{}
+				if accountType, ok := accountMap["type"].(map[string]interface{}); ok {
+					accountArgs = accountType["fields"].([]interface{})
+				}
+				argsValues["data"] = extractArgs(data[8:], accountArgs, types)
+				argsValues["type"] = "account"
+				return argsValues, nil
+			}
 		}
 	}
 	return nil, errors.New("can't find accounts")
@@ -212,12 +249,14 @@ func (p *Parser) eventDataParse(data []byte) (map[string]interface{}, error) {
 			continue
 		}
 		if discriminator, ok := eventMap["discriminator"].([]interface{}); ok {
-			discriminatorBytes := make([]byte, 8)
+			discriminatorBytesLen := len(discriminator)
+
+			discriminatorBytes := make([]byte, discriminatorBytesLen)
 			for i, val := range discriminator {
 				discriminatorBytes[i] = byte(val.(float64))
 			}
 
-			if bytes.Equal(data[:8], discriminatorBytes) {
+			if bytes.Equal(data[:discriminatorBytesLen], discriminatorBytes) {
 				argsValues := make(map[string]interface{})
 				argsValues["name"] = eventMap["name"]
 				argsValues["discriminator"] = eventMap["discriminator"]
@@ -234,7 +273,7 @@ func (p *Parser) eventDataParse(data []byte) (map[string]interface{}, error) {
 						break
 					}
 				}
-				argsValues["data"] = extractArgs(data[8:], eventArgs, types)
+				argsValues["data"] = extractArgs(data[discriminatorBytesLen:], eventArgs, types)
 				argsValues["type"] = "event"
 				return argsValues, nil
 			}
