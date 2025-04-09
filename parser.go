@@ -191,8 +191,7 @@ func (p *Parser) AccountsParse(data []byte) (map[string]interface{}, error) {
 			if !ok {
 				continue
 			}
-			accountName = utils.ToSnakeCase(accountName)
-			hash := sha256.Sum256([]byte(fmt.Sprintf("global:%s", accountName)))
+			hash := sha256.Sum256([]byte(fmt.Sprintf("account:%s", accountName)))
 
 			if bytes.Equal(data[:8], hash[:8]) {
 				argsValues := make(map[string]interface{})
