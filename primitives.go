@@ -9,6 +9,10 @@ import (
 )
 
 func extractPrimitive(data []byte, offset int, argType string) (interface{}, int) {
+	if offset < 0 || offset >= len(data) {
+		return nil, 0
+	}
+
 	switch argType {
 	case "u128":
 		if len(data[offset:]) < 16 {
