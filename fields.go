@@ -46,9 +46,22 @@ func extractNonPrimitive(data []byte, types []interface{}, offset int, argType m
 	if ok {
 		return extractArray(data, types, offset, arr)
 	}
-	obj, ok := argType["defined"].(string)
+	obj, ok := argType["defined"]
 	if ok {
-		return extractObject(data, types, offset, obj)
+		value, ok := obj.(string)
+		if ok {
+			return extractObject(data, types, offset, value)
+		} else {
+			value, ok := obj.(map[string]interface{})
+			if ok {
+				name, ok := value["name"]
+				if ok {
+					if value, ok := name.(string); ok {
+						return extractObject(data, types, offset, value)
+					}
+				}
+			}
+		}
 	}
 	opt, ok := argType["option"]
 	if ok {
