@@ -8,7 +8,13 @@ import (
 	"strings"
 )
 
+const maxRecursiveDepth = 62
+
 func extractArgs(data []byte, args []interface{}, types []interface{}) map[string]interface{} {
+	return extractArgsWithDepth(data, args, types, 0)
+}
+
+func extractArgsWithDepth(data []byte, args []interface{}, types []interface{}, depth int) map[string]interface{} {
 	argsValues := make(map[string]interface{})
 	offset := 0
 	for _, arg := range args {
@@ -17,13 +23,20 @@ func extractArgs(data []byte, args []interface{}, types []interface{}) map[strin
 		argType := argMap["type"]
 
 		var n int
-		argsValues[argName], n = extractValue(data, types, offset, argType)
+		argsValues[argName], n = extractValueWithDepth(data, types, offset, argType, depth)
 		offset += n
 	}
 	return argsValues
 }
 
 func extractValue(data []byte, types []interface{}, offset int, argType interface{}) (interface{}, int) {
+	return extractValueWithDepth(data, types, offset, argType, 0)
+}
+
+func extractValueWithDepth(data []byte, types []interface{}, offset int, argType interface{}, depth int) (interface{}, int) {
+	if depth > maxRecursiveDepth {
+		return nil, 0
+	}
 	pType, ok := argType.(string)
 	if ok {
 		return extractPrimitive(data, offset, pType)
@@ -31,13 +44,16 @@ func extractValue(data []byte, types []interface{}, offset int, argType interfac
 
 	npType, ok := argType.(map[string]interface{})
 	if ok {
-		return extractNonPrimitive(data, types, offset, npType)
+		return extractNonPrimitiveWithDepth(data, types, offset, npType, depth+1)
 	}
 
 	return nil, 0
 }
 
-func extractNonPrimitive(data []byte, types []interface{}, offset int, argType map[string]interface{}) (interface{}, int) {
+func extractNonPrimitiveWithDepth(data []byte, types []interface{}, offset int, argType map[string]interface{}, depth int) (interface{}, int) {
+	if depth > maxRecursiveDepth {
+		return nil, 0
+	}
 	vec, ok := argType["vec"]
 	if ok {
 		return extractVector(data, types, offset, vec)
@@ -50,14 +66,14 @@ func extractNonPrimitive(data []byte, types []interface{}, offset int, argType m
 	if ok {
 		value, ok := obj.(string)
 		if ok {
-			return extractObject(data, types, offset, value)
+			return extractObjectWithDepth(data, types, offset, value, depth+1)
 		} else {
 			value, ok := obj.(map[string]interface{})
 			if ok {
 				name, ok := value["name"]
 				if ok {
 					if value, ok := name.(string); ok {
-						return extractObject(data, types, offset, value)
+						return extractObjectWithDepth(data, types, offset, value, depth+1)
 					}
 				}
 			}
@@ -65,28 +81,33 @@ func extractNonPrimitive(data []byte, types []interface{}, offset int, argType m
 	}
 	opt, ok := argType["option"]
 	if ok {
-		return extractValue(data, types, offset, opt)
+		return extractValueWithDepth(data, types, offset, opt, depth+1)
 	}
 	return nil, 0
 }
 
-func extractObject(data []byte, types []interface{}, offset int, typeName string) (string, int) {
+func extractObjectWithDepth(data []byte, types []interface{}, offset int, typeName string, depth int) (string, int) {
+	if depth > maxRecursiveDepth {
+		return "", 0
+	}
 	typeData, err := extractTypeData(types, typeName)
 	if err != nil {
 		return "", 0
 	}
 	switch typeData["kind"] {
 	case "struct":
-		return extractStruct(data, types, offset, typeData)
+		return extractStructWithDepth(data, types, offset, typeData, depth+1)
 	case "enum":
-		return extractEnum(data, types, offset, typeData)
+		return extractEnumWithDepth(data, types, offset, typeData, depth+1)
 	default:
 		panic(fmt.Sprintf("that kind is not supported, kind: %s", typeData["kind"]))
 	}
-
 }
 
-func extractStruct(data []byte, types []interface{}, offset int, typeData map[string]interface{}) (string, int) {
+func extractStructWithDepth(data []byte, types []interface{}, offset int, typeData map[string]interface{}, depth int) (string, int) {
+	if depth > maxRecursiveDepth {
+		return "", 0
+	}
 	fields := typeData["fields"].([]interface{})
 
 	res := make(map[string]interface{})
@@ -98,17 +119,18 @@ func extractStruct(data []byte, types []interface{}, offset int, typeData map[st
 		if !ok {
 			log.Println("cannot cast field to map[string]interface{}, in extractObject")
 		}
-		res[field["name"].(string)], n_i = extractValue(data, types, offset+n, field["type"])
+		res[field["name"].(string)], n_i = extractValueWithDepth(data, types, offset+n, field["type"], depth+1)
 		n += n_i
 	}
 
-	// IDK maybe I should check it :)
 	json, _ := json.Marshal(res)
-
 	return string(json), n
 }
 
-func extractEnum(data []byte, types []interface{}, offset int, typeData map[string]interface{}) (string, int) {
+func extractEnumWithDepth(data []byte, types []interface{}, offset int, typeData map[string]interface{}, depth int) (string, int) {
+	if depth > maxRecursiveDepth {
+		return "", 0
+	}
 	variants := typeData["variants"].([]interface{})
 	variantId := data[offset]
 	variant := variants[variantId].(map[string]interface{})
@@ -128,60 +150,60 @@ func extractEnum(data []byte, types []interface{}, offset int, typeData map[stri
 
 	_, ok = fields[0].(string)
 	if ok {
-		option, n_i := handleUnnamedEnumArgs(data, types, offset+n, fields)
+		option, n_i := handleUnnamedEnumArgsWithDepth(data, types, offset+n, fields, depth+1)
 		n += n_i
 
 		res[memberName] = option
-		// IDK maybe I should check err value here :)
 		json, _ := json.Marshal(res)
-
 		return string(json), n
 	}
 
 	f1, ok := fields[0].(map[string]interface{})
 	_, hasName := f1["name"]
 	if ok && !hasName {
-		option, n_i := handleUnnamedEnumArgs(data, types, offset+n, fields)
+		option, n_i := handleUnnamedEnumArgsWithDepth(data, types, offset+n, fields, depth+1)
 		n += n_i
 
 		res[memberName] = option
-		// IDK maybe I should check err value here :)
 		json, _ := json.Marshal(res)
-
 		return string(json), n
 	}
 
-	option, n_i := handleNamedEnumArgs(data, types, offset+n, fields)
+	option, n_i := handleNamedEnumArgsWithDepth(data, types, offset+n, fields, depth+1)
 	n += n_i
 
 	res[memberName] = option
-
-	// IDK maybe I should check err value here :)
 	json, _ := json.Marshal(res)
-
 	return string(json), n
 }
 
-func handleNamedEnumArgs(data []byte, types []interface{}, offset int, fields []interface{}) (interface{}, int) {
+func handleNamedEnumArgsWithDepth(data []byte, types []interface{}, offset int, fields []interface{}, depth int) (interface{}, int) {
+	if depth > maxRecursiveDepth {
+		return nil, 0
+	}
 	n := 0
 	var n_i int
 	option := make(map[string]interface{})
 	for _, field := range fields {
 		obj, ok := field.(map[string]interface{})
 		if ok {
-			option[obj["name"].(string)], n_i = extractValue(data, types, offset+n, obj["type"])
+			option[obj["name"].(string)], n_i = extractValueWithDepth(data, types, offset+n, obj["type"], depth+1)
 			n += n_i
 			continue
 		}
 	}
 	return option, n
 }
-func handleUnnamedEnumArgs(data []byte, types []interface{}, offset int, fields []interface{}) (interface{}, int) {
+
+func handleUnnamedEnumArgsWithDepth(data []byte, types []interface{}, offset int, fields []interface{}, depth int) (interface{}, int) {
+	if depth > maxRecursiveDepth {
+		return nil, 0
+	}
 	n := 0
 	var n_i int
 	option := make([]interface{}, len(fields))
 	for i, field := range fields {
-		option[i], n_i = extractValue(data, types, offset+n, field)
+		option[i], n_i = extractValueWithDepth(data, types, offset+n, field, depth+1)
 		n += n_i
 	}
 	return option, n
