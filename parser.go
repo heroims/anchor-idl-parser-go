@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"strings"
 
@@ -128,7 +127,7 @@ func (p *Parser) InstructionParse(data []byte) (map[string]interface{}, error) {
 				continue
 			}
 			instructionName = utils.ToSnakeCase(instructionName)
-			hash := sha256.Sum256([]byte(fmt.Sprintf("global:%s", instructionName)))
+			hash := sha256.Sum256([]byte("global:" + instructionName))
 
 			if bytes.Equal(data[:8], hash[:8]) {
 				argsValues := make(map[string]interface{})
@@ -191,7 +190,7 @@ func (p *Parser) AccountsParse(data []byte) (map[string]interface{}, error) {
 			if !ok {
 				continue
 			}
-			hash := sha256.Sum256([]byte(fmt.Sprintf("account:%s", accountName)))
+			hash := sha256.Sum256([]byte("account:" + accountName))
 
 			if bytes.Equal(data[:8], hash[:8]) {
 				argsValues := make(map[string]interface{})
@@ -282,7 +281,7 @@ func (p *Parser) eventDataParse(data []byte) (map[string]interface{}, error) {
 			if !ok {
 				continue
 			}
-			hash := sha256.Sum256([]byte(fmt.Sprintf("event:%s", eventName)))
+			hash := sha256.Sum256([]byte("event:" + eventName))
 
 			if bytes.Equal(data[:8], hash[:8]) {
 				argsValues := make(map[string]interface{})
