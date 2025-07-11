@@ -5,10 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"os"
 	"strings"
+
+	"github.com/bytedance/sonic"
 
 	"github.com/heroims/anchor-idl-parser-go/utils"
 )
@@ -38,7 +39,7 @@ func NewParserWithPath(idlPath string) (*Parser, error) {
 	}
 	idlJson := string(idlData)
 	var idlMap map[string]interface{}
-	err = json.Unmarshal([]byte(idlJson), &idlMap)
+	err = sonic.Unmarshal([]byte(idlJson), &idlMap)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +52,7 @@ func NewParserWithPath(idlPath string) (*Parser, error) {
 
 func NewParserWithJson(idlJson string) (*Parser, error) {
 	var idlMap map[string]interface{}
-	err := json.Unmarshal([]byte(idlJson), &idlMap)
+	err := sonic.Unmarshal([]byte(idlJson), &idlMap)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +64,7 @@ func NewParserWithJson(idlJson string) (*Parser, error) {
 }
 
 func NewParserWithJsonMap(idlMap map[string]interface{}) (*Parser, error) {
-	jsonBytes, err := json.Marshal(idlMap)
+	jsonBytes, err := sonic.Marshal(idlMap)
 	if err != nil {
 		panic(err)
 	}

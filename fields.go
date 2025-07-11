@@ -1,11 +1,12 @@
 package anchor_idl_parser
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"strings"
+
+	"github.com/bytedance/sonic"
 )
 
 const maxRecursiveDepth = 62
@@ -123,7 +124,7 @@ func extractStructWithDepth(data []byte, types []interface{}, offset int, typeDa
 		n += n_i
 	}
 
-	json, _ := json.Marshal(res)
+	json, _ := sonic.Marshal(res)
 	return string(json), n
 }
 
@@ -142,7 +143,7 @@ func extractEnumWithDepth(data []byte, types []interface{}, offset int, typeData
 	fields, ok := variant["fields"].([]interface{})
 	if !ok {
 		res[memberName] = make(map[string]interface{})
-		json, _ := json.Marshal(res)
+		json, _ := sonic.Marshal(res)
 		return string(json), 1
 	}
 
@@ -154,7 +155,7 @@ func extractEnumWithDepth(data []byte, types []interface{}, offset int, typeData
 		n += n_i
 
 		res[memberName] = option
-		json, _ := json.Marshal(res)
+		json, _ := sonic.Marshal(res)
 		return string(json), n
 	}
 
@@ -165,7 +166,7 @@ func extractEnumWithDepth(data []byte, types []interface{}, offset int, typeData
 		n += n_i
 
 		res[memberName] = option
-		json, _ := json.Marshal(res)
+		json, _ := sonic.Marshal(res)
 		return string(json), n
 	}
 
@@ -173,7 +174,7 @@ func extractEnumWithDepth(data []byte, types []interface{}, offset int, typeData
 	n += n_i
 
 	res[memberName] = option
-	json, _ := json.Marshal(res)
+	json, _ := sonic.Marshal(res)
 	return string(json), n
 }
 
