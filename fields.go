@@ -133,9 +133,17 @@ func extractEnumWithDepth(data []byte, types []interface{}, offset int, typeData
 		return "", 0
 	}
 	variants := typeData["variants"].([]interface{})
+	if offset >= len(data) {
+		return "", 0
+	}
 	variantId := data[offset]
-	variant := variants[variantId].(map[string]interface{})
-
+	if int(variantId) >= len(variants) {
+		return "", 0
+	}
+	variant, ok := variants[variantId].(map[string]interface{})
+	if !ok {
+		return "", 0
+	}
 	memberName := variant["name"].(string)
 
 	res := make(map[string]interface{})
