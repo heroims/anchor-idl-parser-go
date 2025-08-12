@@ -124,16 +124,20 @@ func extractStructWithDepth(data []byte, types []interface{}, offset int, typeDa
 
 	var n_i int
 	for _, field := range fields {
-		field, ok := field.(map[string]interface{})
-		if !ok {
-			log.Println("cannot cast field to map[string]interface{}, in extractObject")
+		if tmpField, ok := field.(map[string]interface{}); ok {
+			fieldName, ok := tmpField["name"].(string)
+			if !ok {
+				continue
+			}
+			res[fieldName], n_i = extractValueWithDepth(data, types, offset+n, tmpField["type"], depth+1)
+			n += n_i
+		} else if tmpField, ok := field.(string); ok {
+			res[fmt.Sprintf("filed%d", n)], n_i = extractValueWithDepth(data, types, offset+n, tmpField, depth+1)
+			n += n_i
+		} else {
+			log.Println("cannot cast field to map[string]interface{},string in extractObject")
 		}
-		fieldName, ok := field["name"].(string)
-		if !ok {
-			continue
-		}
-		res[fieldName], n_i = extractValueWithDepth(data, types, offset+n, field["type"], depth+1)
-		n += n_i
+
 	}
 
 	json, _ := sonic.Marshal(res)
