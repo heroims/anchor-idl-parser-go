@@ -48,7 +48,10 @@ func extractVector(data []byte, types []interface{}, offset int, argType interfa
 // extractArray 解析定长 array，内部 args 类型由 IDL 给出
 func extractArray(data []byte, types []interface{}, offset int, argType interface{}) (string, int) {
 	// 1. 从 argType 中拿到 (elemType, length)
-	meta := argType.([]interface{})
+	meta, ok := argType.([]interface{})
+	if !ok {
+		return "", 0
+	}
 	rawLen := meta[1]
 	length := 0
 	switch v := rawLen.(type) {

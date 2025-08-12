@@ -19,8 +19,14 @@ func extractArgsWithDepth(data []byte, args []interface{}, types []interface{}, 
 	argsValues := make(map[string]interface{})
 	offset := 0
 	for _, arg := range args {
-		argMap := arg.(map[string]interface{})
-		argName := argMap["name"].(string)
+		argMap, ok := arg.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		argName, ok := argMap["name"].(string)
+		if !ok {
+			continue
+		}
 		argType := argMap["type"]
 
 		var n int
@@ -109,8 +115,10 @@ func extractStructWithDepth(data []byte, types []interface{}, offset int, typeDa
 	if depth > maxRecursiveDepth {
 		return "", 0
 	}
-	fields := typeData["fields"].([]interface{})
-
+	fields, ok := typeData["fields"].([]interface{})
+	if !ok {
+		return "", 0
+	}
 	res := make(map[string]interface{})
 	var n int = 0
 
@@ -120,7 +128,11 @@ func extractStructWithDepth(data []byte, types []interface{}, offset int, typeDa
 		if !ok {
 			log.Println("cannot cast field to map[string]interface{}, in extractObject")
 		}
-		res[field["name"].(string)], n_i = extractValueWithDepth(data, types, offset+n, field["type"], depth+1)
+		fieldName, ok := field["name"].(string)
+		if !ok {
+			continue
+		}
+		res[fieldName], n_i = extractValueWithDepth(data, types, offset+n, field["type"], depth+1)
 		n += n_i
 	}
 
@@ -132,7 +144,10 @@ func extractEnumWithDepth(data []byte, types []interface{}, offset int, typeData
 	if depth > maxRecursiveDepth {
 		return "", 0
 	}
-	variants := typeData["variants"].([]interface{})
+	variants, ok := typeData["variants"].([]interface{})
+	if !ok {
+		return "", 0
+	}
 	if offset >= len(data) {
 		return "", 0
 	}
@@ -144,8 +159,10 @@ func extractEnumWithDepth(data []byte, types []interface{}, offset int, typeData
 	if !ok {
 		return "", 0
 	}
-	memberName := variant["name"].(string)
-
+	memberName, ok := variant["name"].(string)
+	if !ok {
+		return "", 0
+	}
 	res := make(map[string]interface{})
 
 	fields, ok := variant["fields"].([]interface{})
@@ -196,9 +213,12 @@ func handleNamedEnumArgsWithDepth(data []byte, types []interface{}, offset int, 
 	for _, field := range fields {
 		obj, ok := field.(map[string]interface{})
 		if ok {
-			option[obj["name"].(string)], n_i = extractValueWithDepth(data, types, offset+n, obj["type"], depth+1)
-			n += n_i
-			continue
+			objName, ok := obj["name"].(string)
+			if ok {
+				option[objName], n_i = extractValueWithDepth(data, types, offset+n, obj["type"], depth+1)
+				n += n_i
+				continue
+			}
 		}
 	}
 	return option, n
@@ -224,9 +244,16 @@ func extractTypeData(types []interface{}, typeName string) (map[string]interface
 		if !ok {
 			return nil, errors.New("cannot cast type to map[string]interface{}")
 		}
-		if strings.EqualFold(t["name"].(string), typeName) {
-			return t["type"].(map[string]interface{}), nil
+		tName, ok := t["name"].(string)
+		if ok {
+			if strings.EqualFold(tName, typeName) {
+				tType, ok := t["type"].(map[string]interface{})
+				if ok {
+					return tType, nil
+				}
+			}
 		}
+
 	}
 	return nil, fmt.Errorf("couldn't find type: %s, in: %+v", typeName, types)
 }

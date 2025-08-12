@@ -110,14 +110,18 @@ func (p *Parser) InstructionParse(data []byte) (map[string]interface{}, error) {
 
 			discriminatorBytes := make([]byte, discriminatorBytesLen)
 			for i, val := range discriminator {
-				discriminatorBytes[i] = byte(val.(float64))
+				if valValue, ok := val.(float64); ok {
+					discriminatorBytes[i] = byte(valValue)
+				}
 			}
 
 			if bytes.Equal(data[:discriminatorBytesLen], discriminatorBytes) {
 				argsValues := make(map[string]interface{})
 				argsValues["name"] = instructionMap["name"]
 				argsValues["discriminator"] = instructionMap["discriminator"]
-				argsValues["data"] = extractArgs(data[discriminatorBytesLen:], instructionMap["args"].([]interface{}), types)
+				if argsValue, ok := instructionMap["args"].([]interface{}); ok {
+					argsValues["data"] = extractArgs(data[discriminatorBytesLen:], argsValue, types)
+				}
 				argsValues["type"] = "instruction"
 				return argsValues, nil
 			}
@@ -163,7 +167,9 @@ func (p *Parser) AccountsParse(data []byte) (map[string]interface{}, error) {
 
 			discriminatorBytes := make([]byte, discriminatorBytesLen)
 			for i, val := range discriminator {
-				discriminatorBytes[i] = byte(val.(float64))
+				if valValue, ok := val.(float64); ok {
+					discriminatorBytes[i] = byte(valValue)
+				}
 			}
 			if bytes.Equal(data[:discriminatorBytesLen], discriminatorBytes) {
 				argsValues := make(map[string]interface{})
@@ -176,7 +182,9 @@ func (p *Parser) AccountsParse(data []byte) (map[string]interface{}, error) {
 					}
 					if typeMap["name"] == accountMap["name"] {
 						if typeDetails, ok := typeMap["type"].(map[string]interface{}); ok {
-							accountArgs = typeDetails["fields"].([]interface{})
+							if tmpAccountArgs, ok := typeDetails["fields"].([]interface{}); ok {
+								accountArgs = tmpAccountArgs
+							}
 						}
 						break
 					}
@@ -198,7 +206,9 @@ func (p *Parser) AccountsParse(data []byte) (map[string]interface{}, error) {
 				argsValues["name"] = accountMap["name"]
 				var accountArgs []interface{}
 				if accountType, ok := accountMap["type"].(map[string]interface{}); ok {
-					accountArgs = accountType["fields"].([]interface{})
+					if tmpAccountArgs, ok := accountType["fields"].([]interface{}); ok {
+						accountArgs = tmpAccountArgs
+					}
 				}
 				argsValues["data"] = extractArgs(data[8:], accountArgs, types)
 				argsValues["type"] = "account"
@@ -252,7 +262,9 @@ func (p *Parser) eventDataParse(data []byte) (map[string]interface{}, error) {
 
 			discriminatorBytes := make([]byte, discriminatorBytesLen)
 			for i, val := range discriminator {
-				discriminatorBytes[i] = byte(val.(float64))
+				if valValue, ok := val.(float64); ok {
+					discriminatorBytes[i] = byte(valValue)
+				}
 			}
 
 			if bytes.Equal(data[:discriminatorBytesLen], discriminatorBytes) {
@@ -267,7 +279,9 @@ func (p *Parser) eventDataParse(data []byte) (map[string]interface{}, error) {
 					}
 					if typeMap["name"] == eventMap["name"] {
 						if typeDetails, ok := typeMap["type"].(map[string]interface{}); ok {
-							eventArgs = typeDetails["fields"].([]interface{})
+							if tmpEventArgs, ok := typeDetails["fields"].([]interface{}); ok {
+								eventArgs = tmpEventArgs
+							}
 						}
 						break
 					}
@@ -287,7 +301,9 @@ func (p *Parser) eventDataParse(data []byte) (map[string]interface{}, error) {
 			if bytes.Equal(data[:8], hash[:8]) {
 				argsValues := make(map[string]interface{})
 				argsValues["name"] = eventName
-				argsValues["data"] = extractArgs(data[8:], eventMap["fields"].([]interface{}), types)
+				if filedValue, ok := eventMap["fields"].([]interface{}); ok {
+					argsValues["data"] = extractArgs(data[8:], filedValue, types)
+				}
 				argsValues["type"] = "event"
 				return argsValues, nil
 			}
